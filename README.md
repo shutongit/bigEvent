@@ -1541,10 +1541,344 @@ router.post('/update', expressJoi(update_cate_schema), updateArtCateById)
 
 ## 5.2 发布新文章
 
+### 5.2.0 实现步骤
+
+1. 初始化路由模块
+2. 初始化路由处理函数模块
+3. 使用multer解析表单数据
+4. 验证表单数据
+5. 实现发布文章的功能
+
+### 5.2.1 初始化路由模块
+
+1. 创建`/router/article.js`路由模块，并初始化如下代码：
+
+```js
+
+const express = require('express')
+
+const router = express.Router()
+
+// 发布新文章
+router.post('/add', (req, res) => {
+  res.send('ok')
+})
+
+module.exports = router
+```
+
+2. 在 `app.js`模块中导入并使用文章路由：
+
+```js
+// 导入并使用文章的路由模块
+const articleRouter = require('./router/article')
+app.use('/my/article', articleRouter)
+
+```
+
+
+
+### 5.2.2 初始化路由处理函数模块
+
+1. 创建`/router_handler/article.js`路由处理函数模块，并初始化如下的代码结构：
+
+```js
+exports.addArticle = (req, res) => {
+  res.send('ok')
+}
+```
+
+2. 修改`/router/article.js`中的代码如下：
+
+```js
+
+const express = require('express')
+
+const router = express.Router()
+
+// 导入文章的路由处理函数模块
+const { addArticle } = require('../router_handler/article')
+
+// 发布新文章
+router.post('/add', addArticle)
+
+module.exports = router
+```
+
+
+
+### 5.2.3 使用multer解析表单数据
+
+1. 安装`multer`：
+
+```js
+npm install --save multer
+```
+
+2. 修改`/router/article.js`路由模块中，导入`multer`，并配置文件的存储位置：
+
+```js
+const express = require('express')
+
+const router = express.Router()
+
+// 导入文章的路由处理函数模块
+const { addArticle } = require('../router_handler/article')
+
+// 导入解析器
+const multer = require('multer')
+// 配置文件保存的路径
+const upload = multer({ dest: 'uploads/cover/' })
+
+// 发布新文章
+router.post('/add', upload.single('cover_img'), addArticle)
+
+module.exports = router
+```
+
+
+
+### 5.2.4 验证表单数据
+
+1. 新建 `/schema/article.js`表单验证模块，并初始化如下格式代码：
+
+```js
+
+// 导入数据校验模块
+const joi = require('joi')
+
+// 标题
+const title = joi.string().required()
+
+// 内容
+const content = joi.string().min(1).max(100).required()
+
+//  所属分类
+const cate_id = joi.number().required()
+
+// 发布状态： 0：草稿；1 发布
+const state = joi.number().required()
+
+// 较验规则 -- 添加文章
+exports.add_article_schema = {
+  body: {
+    title,
+    content,
+    cate_id,
+    state
+  }
+}
+```
+
+2. 在 `/router/article.js`中导入并使用较验规则：
+
+```js
+
+const express = require('express')
+
+const router = express.Router()
+
+// 导入文章的路由处理函数模块
+const { addArticle } = require('../router_handler/article')
+
+// 导入解析器
+const multer = require('multer')
+// 配置文件保存的路径
+const upload = multer({ dest: 'uploads/cover/' })
+
+// 导入校验规则
+const {add_article_schema} = require('../schema/article')
+
+
+// 发布新文章 ; 
+router.post('/add', upload.single('cover_img'), add_article_schema(addArticle))
+
+module.exports = router
+```
+
+
+
+### 5.2.5 实现发布文章的功能
+
+1. 在`/router_handler/article.js`路由处理函数模块中，使用如下代码：
+
+```js
+const db = require('../db/index')
+
+exports.addArticle = (req, res) => {
+  req.body.author_id = req.auth.id
+  req.body.pub_date = Date.now()
+  const sql = `INSERT INTO ev_articles SET ?`
+  db.query(sql, req.body, (err, results) => {
+    if (err) return res.cc(err)
+    if (results.affectedRows !== 1) return res.cc('新增文章失败！')
+    res.cc('新增文章成功！', 0)
+  })
+}
+```
+
+
+
 ## 5.3 获取文章的列表数据
+
+1. 在`/router/article.js`中添加`获取文章了列表`的路由：
+
+```js
+const { addArticle, getArticles } = require('../router_handler/article')
+
+router.get('/list', getArticles)
+```
+
+2. 在 `/router_handler/article.js`处理函数中，声明并共享`获取文章列表`函数：
+
+```js
+// 获取文章列表
+exports.getArticles = (req, res) => {
+  const sql = `SELECT * FROM ev_articles WHERE is_delete=0 ORDER BY id asc`
+  db.query(sql, (err, results) => {
+    if (err) return res.cc(err)
+    res.send({
+      status: 0,
+      message: '获取文章列表成功！',
+      data: results
+    })
+  })
+}
+```
+
+
 
 ## 5.4 根据 Id 删除文章数据
 
+1. 在 `/schema/article.js`表单验证模块中，添加并共享`删除文章`验证：
+
+```js
+const id = joi.number().required()
+// 较验规则 -- 删除文章
+exports.delete_article_schema = {
+  body: {
+    id
+  }
+}
+```
+
+2. 在`/router/article.js`路由模块，创建`删除文章`路由：
+
+```js
+// 根据 Id 删除文章数据
+router.post('/delete/article', expressJoi(delete_article_schema), deleteArticleById)
+```
+
+3. 在 `/router_handler/article.js`路由处理函数模块中，创建并共享：
+
+```js
+
+// 根据 Id 删除文章数据
+exports.deleteArticleById = (req, res) => {
+
+  const sql = `UPDATE ev_articles SET is_delete=1 WHERE id=?`
+  db.query(sql, req.body.id, (err, results) => {
+    if (err) return res.cc(err)
+    if (results.affectedRows != 1) return res.cc('删除文章失败！')
+    res.cc('删除文章成功', 0)
+  })
+}
+```
+
+
+
 ## 5.5 根据 Id 获取文章详情
 
+```js
+// 根据 Id 获取文章详情
+router.post('/info/article', getArticleInfoById)
+
+```
+
+1. 在 `/schema/article.js`验证模块中，创建并共享`根据id文章详情`验证规则对象：
+
+```js
+// 较验规则 -- 根据id获取文章信息
+exports.info_article_schema = {
+  body: {
+    id
+  }
+}
+
+```
+
+2. 在 `/router/article.js`路由中，导入并使用验证规则：
+
+```js
+const { add_article_schema, delete_article_schema, info_article_schema, update_article_schema } = require('../schema/article')
+
+
+// 根据 Id 获取文章详情
+router.post('/info/article', expressJoi(info_article_schema), getArticleInfoById)
+
+```
+
+3. 在 `/router_handler/article.js`路由处理函数中，导出`根据id更新文章信息`处理函数:
+
+```js
+
+// 根据 Id 获取文章详情
+exports.getArticleInfoById = (req, res) => {
+  const sql = `SELECT * FROM ev_articles WHERE id=?`
+  db.query(sql, req.body.id, (err, results) => {
+    if (err) return res.cc(err)
+    if (results.length != 1) return res.cc('获取文章失败！')
+    res.send({
+      status: 0,
+      message: '获取文章成功',
+      data: results[0]
+    })
+  })
+}
+```
+
+
+
 ## 5.6 根据 Id 更新文章信息
+
+1. 在 `/schema/article.js`验证模块中，创建并共享`根据id更新文章信息`验证规则对象：
+
+```js
+// 较验规则 -- 根据id更新文章信息
+exports.update_article_schema = {
+  body: {
+    id,
+    cover_img,
+    content,
+    title
+  }
+}
+```
+
+2. 在 `/router/article.js`路由中，导入并使用验证规则：
+
+```js
+
+const { add_article_schema, delete_article_schema, info_article_schema, update_article_schema } = require('../schema/article')
+
+// 根据 Id 更新文章信息
+router.post('/update/article', upload.single('cover_img'), expressJoi(update_article_schema), updateArticleById)
+
+```
+
+3. 在 `/router_handler/article.js`路由处理函数中，导出`根据id更新文章信息`处理函数:
+
+```js
+// 根据 Id 更新文章信息
+exports.updateArticleById = (req, res) => {
+  const sql = `UPDATE ev_articles SET title=?, content=?, cover_img=? WHERE id=?`
+  db.query(sql, [req.body.title, req.body.content, req.body.cover_img, req.body.id], (err, results) => {
+    if (err) return res.cc(err)
+    if (results.affectedRows != 1) return res.cc('更新文章失败！')
+    res.cc('更新文章成功', 0)
+  })
+}
+```
+
+
+

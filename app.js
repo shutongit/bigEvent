@@ -42,6 +42,10 @@ app.use('/my', userinfoRouter)
 const artCateRouter = require('./router/artcate')
 app.use('/my/article', artCateRouter)
 
+// 导入并使用文章的路由模块
+const articleRouter = require('./router/article')
+app.use('/my/article', articleRouter)
+
 
 // 定义错误级别的中间件
 const joi = require('joi')
@@ -58,6 +62,6 @@ app.use((err, req, res, next) => {
 
 
 // 启动服务
-app.listen(3007, '192.168.100.83', () => {
-  console.log('api server running at: 192.168.100.83:3007')
+app.listen(3007, '192.168.30.13', () => {
+  console.log('api server running at: 192.168.30.13:3007')
 })
